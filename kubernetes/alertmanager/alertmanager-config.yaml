@@ -1,0 +1,33 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: custom-inhibit-rules
+  namespace: monitoring
+  labels:
+    alertmanager: prometheus-kube-prometheus-alertmanager
+spec:
+  inhibitRules:
+    - sourceMatches:
+        - name: alertname
+          value: MongoDBInstanceDown
+      targetMatches:
+        - name: alertname
+          value: TodoAppDown
+      equal:
+        - namespace
+    - sourceMatches:
+        - name: alertname
+          value: TodoAppDown
+      targetMatches:
+        - name: alertname
+          value: HighActiveTodos
+      equal:
+        - namespace
+    - sourceMatches:
+        - name: alertname
+          value: TodoAppDown
+      targetMatches:
+        - name: alertname
+          value: HighDatabaseErrorRate
+      equal:
+        - namespace
