@@ -54,39 +54,39 @@ alertmanager:
           group_wait: 10s
           repeat_interval: 30m
 
-    inhibit_rules:
-      # Suppress by severity (standard practice)
-      - source_matchers:
-          - severity="critical"
-        target_matchers:
-          - severity="warning"
-        equal:
-          - namespace
-          - alertname
+    # inhibit_rules:
+    #   # Suppress by severity (standard practice)
+    #   - source_matchers:
+    #       - severity="critical"
+    #     target_matchers:
+    #       - severity="warning"
+    #     equal:
+    #       - namespace
+    #       - alertname
 
-      - source_matchers:
-          - severity="warning"
-        target_matchers:
-          - severity="info"
-        equal:
-          - namespace
-          - alertname
+    #   - source_matchers:
+    #       - severity="warning"
+    #     target_matchers:
+    #       - severity="info"
+    #     equal:
+    #       - namespace
+    #       - alertname
 
-      # When MongoDB is down, suppress TodoAppDown
-      - source_matchers:
-          - alertname="MongoDBInstanceDown"
-        target_matchers:
-          - alertname="TodoAppDown"
-        equal:
-          - namespace
-      # # When TodoApp is down, suppress HighActiveTodos and HighDatabaseErrorRate
-      # - source_matchers:
-      #     - alertname="TodoAppDown"
-      #   target_matchers:
-      #     - alertname="HighActiveTodos"
-      #     - alertname="HighDatabaseErrorRate"
-      #   equal:
-      #     - namespace
+    #   # When MongoDB is down, suppress TodoAppDown
+    #   - source_matchers:
+    #       - alertname="MongoDBInstanceDown"
+    #     target_matchers:
+    #       - alertname="TodoAppDown"
+    #     equal:
+    #       - namespace
+    # # When TodoApp is down, suppress HighActiveTodos and HighDatabaseErrorRate
+    # - source_matchers:
+    #     - alertname="TodoAppDown"
+    #   target_matchers:
+    #     - alertname="HighActiveTodos"
+    #     - alertname="HighDatabaseErrorRate"
+    #   equal:
+    #     - namespace
 
     receivers:
       - name: "email-notifications"
