@@ -1,0 +1,108 @@
+# creating "todo-fastapi-mongodb" namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: todo-fastapi-mongodb
+  labels:
+    name: todo-fastapi-mongodb
+
+---
+# MongoDB Secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-credentials
+  namespace: todo-fastapi-mongodb
+type: Opaque
+data:
+  MONGO_INITDB_ROOT_USERNAME: "YWRtaW4=" ## assumes this is base64 encoded, and interprets as admin
+  MONGO_INITDB_ROOT_PASSWORD: "cGFzc3dvcmQxMjM=" ## assumes this is base64 encoded, and interprets as password123
+  CONNECTION_URI: "bW9uZ29kYjovL2FkbWluOnBhc3N3b3JkMTIzQG1vbmdvZGItc2VydmljZS50b2RvLWZhc3RhcGktbW9uZ29kYi5zdmMuY2x1c3Rlci5sb2NhbDoyNzAxNy90b2RvLWFwcD9hdXRoU291cmNlPWFkbWlu" #base64 encoded mongodb://admin:password@mongodb-service.todo-fastapi-mongodb.svc.cluster.local:27017/todo-app?authSource=admin
+
+---
+# MongoDB Persistent Volume Claim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongodb-pvc
+  namespace: todo-fastapi-mongodb
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: standard
+
+---
+# MongoDB Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: todo-fastapi-mongodb
+  labels:
+    app: mongodb
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+        - name: mongodb
+          image: mongo:6.0
+          ports:
+            - containerPort: 27017
+          envFrom:
+            - secretRef:
+                name: mongo-credentials
+          volumeMounts:
+            - name: mongodb-storage
+              mountPath: /data/db
+          livenessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 60
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+          readinessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1024Mi"
+              cpu: "500m"
+      volumes:
+        - name: mongodb-storage
+          persistentVolumeClaim:
+            claimName: mongodb-pvc
+
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: todo-fastapi-mongodb
+  labels:
+    app: mongodb
+spec:
+  selector:
+    app: mongodb
+  ports:
+    - port: 27017
+      targetPort: 27017
+  type: ClusterIP
