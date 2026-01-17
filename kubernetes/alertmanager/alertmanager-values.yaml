@@ -1,0 +1,120 @@
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    # Mount the secret inside Alertmanager
+    secrets:
+      - alertmanager-credentials
+    # Environment variables mapped from the secret
+    env:
+      - name: SMTP_FROM
+        valueFrom:
+          secretKeyRef:
+            name: alertmanager-credentials
+            key: smtp-from
+      - name: SMTP_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: alertmanager-credentials
+            key: smtp-username
+      - name: SMTP_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: alertmanager-credentials
+            key: smtp-password
+      - name: EMAIL_TO
+        valueFrom:
+          secretKeyRef:
+            name: alertmanager-credentials
+            key: email-to
+      - name: SLACK_WEBHOOK_URL
+        valueFrom:
+          secretKeyRef:
+            name: alertmanager-credentials
+            key: slack-webhook-url
+  config:
+    global:
+      resolve_timeout: 5m
+      smtp_smarthost: "smtp.gmail.com:587"
+      smtp_from: ${SMTP_FROM}
+      smtp_auth_username: ${SMTP_USERNAME}
+      smtp_auth_password: ${SMTP_PASSWORD}
+      smtp_require_tls: true
+
+    route:
+      receiver: "email-notifications" # DEFAULT (non-critical)
+      group_by: ["alertname", "namespace", "deployment"]
+      group_wait: 30s # wait to collects all related alerts
+      group_interval: 5m
+      repeat_interval: 6h
+
+      routes:
+        - matchers:
+            - severity="critical"
+          receiver: "slack-notifications"
+          group_wait: 10s
+          repeat_interval: 30m
+
+    inhibit_rules:
+      # Suppress by severity (standard practice)
+      - source_matchers:
+          - severity="critical"
+        target_matchers:
+          - severity="warning"
+        equal:
+          - namespace
+          - alertname
+
+      - source_matchers:
+          - severity="warning"
+        target_matchers:
+          - severity="info"
+        equal:
+          - namespace
+          - alertname
+
+      # When MongoDB is down, suppress TodoAppDown
+      - source_matchers:
+          - alertname="MongoDBInstanceDown"
+        target_matchers:
+          - alertname="TodoAppDown"
+        equal:
+          - namespace
+      # # When TodoApp is down, suppress HighActiveTodos and HighDatabaseErrorRate
+      # - source_matchers:
+      #     - alertname="TodoAppDown"
+      #   target_matchers:
+      #     - alertname="HighActiveTodos"
+      #     - alertname="HighDatabaseErrorRate"
+      #   equal:
+      #     - namespace
+
+    receivers:
+      - name: "email-notifications"
+        email_configs:
+          - to: ${EMAIL_TO}
+            send_resolved: true
+
+      - name: "slack-notifications"
+        slack_configs:
+          - api_url: ${SLACK_WEBHOOK_URL}
+            channel: "#all-todo-fastapi-mongodb-prometheus-alert"
+            send_resolved: true
+            title: "[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}"
+            text: |-
+              *Namespace:* {{ .GroupLabels.namespace }}
+              *Alert Name:* {{ .GroupLabels.alertname }}
+              *Status:* {{ .Status }}
+              *Number of Alerts:* {{ len .Alerts }}
+
+              {{ range .Alerts.Firing }}
+              *Alert:* {{ .Annotations.description }}
+              *Instance:* {{ .Labels.instance }}
+              *Started:* {{ (.StartsAt.Add 20700000000000).Format "2006-01-02 15:04:05" }}
+              *Severity:* {{ .Labels.severity }}
+              {{ end }}
+
+              {{ range .Alerts.Resolved }}
+              *Resolved:* {{ .Annotations.description }}
+              *Instance:* {{ .Labels.instance }}
+              *Resolved At:* {{ (.EndsAt.Add 20700000000000).Format "2006-01-02 15:04:05" }}
+              {{ end }}
