@@ -1,0 +1,59 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: todo-app-alerts
+  namespace: todo-fastapi-mongodb
+  labels:
+    release: prometheus
+spec:
+  groups:
+    - name: todo-app.rules
+      interval: 30s
+      rules:
+        - alert: HighDatabaseErrorRate
+          expr: rate(db_errors_total[5m]) > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High database error rate on todo-app"
+            description: "Error rate is {{ $value }} errors per second"
+
+        - alert: MongoDBInstanceDown
+          expr: mongodb_up{namespace="todo-fastapi-mongodb",job="mongo-exporter-prometheus-mongodb-exporter"} == 0
+          for: 5s
+          labels:
+            severity: critical
+            team: "devops"
+          annotations:
+            summary: "MongoDB instance is down"
+            description: "MongoDB instance is down for 5 second"
+
+        - alert: HighActiveTodos
+          expr: active_todos_count{namespace="todo-fastapi-mongodb"} > 1000
+          for: 5m
+          labels:
+            severity: info
+          annotations:
+            summary: "High number of active todos"
+            description: "Active todos count: {{ $value }}"
+
+        - alert: PodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total{pod=~"todo-app.*", namespace="todo-fastapi-mongodb"}[15m]) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Todo app pod is crashing"
+            description: "Pod {{ $labels.pod }} is restarting frequently"
+
+        - alert: TodoAppDown
+          expr: absent(up{job="todo-app-service", namespace="todo-fastapi-mongodb"}) or up{job="todo-app-service", namespace="todo-fastapi-mongodb"} == 0
+
+          for: 2m
+          labels:
+            severity: critical
+            instance: "{{ $labels.instance }}"
+          annotations:
+            summary: "Todo app is down"
+            description: "Todo app in {{ .Labels.namespace }} namespace is not responding"
