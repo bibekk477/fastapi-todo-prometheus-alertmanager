@@ -1,0 +1,97 @@
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-app
+  namespace: todo-fastapi-mongodb
+  labels:
+    app: todo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: todo-app
+  template:
+    metadata:
+      labels:
+        app: todo-app
+    spec:
+      containers:
+        - name: todo-app
+          image: bibekk477/todo-fastapi-mongodb:v3
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: mongo-credentials
+                  key: CONNECTION_URI
+            - name: PORT
+              value: "3000"
+          # Liveness: checks only FastAPI process
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          # Readiness: checks FastAPI + MongoDB
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-app-service
+  namespace: todo-fastapi-mongodb
+  labels:
+    app: todo-app
+spec:
+  selector:
+    app: todo-app
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3000
+      protocol: TCP
+
+---
+# ServiceMonitor - scrapes /metrics from port 3000
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: todo-app-monitor
+  namespace: todo-fastapi-mongodb
+  labels:
+    app: todo-app
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: todo-app
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
