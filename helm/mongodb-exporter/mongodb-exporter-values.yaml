@@ -1,0 +1,21 @@
+## MongoDB Helm Chart Values
+# [mongodb[+srv]://][user:pass@]host1[:port1][,host2[:port2],...][/database][?options]
+mongodb:
+  # uri: "mongodb://admin:password123@mongodb.mongodb.svc.cluster.local:27017" #mongodb.svc.cluster.local just in case if the exporter is in different namespace
+
+# Name of an externally managed secret (in the same namespace) containing the connection uri as key `mongodb-uri`.
+# If this is provided, the value mongodb.uri is ignored.
+# If the multi-target mode is enabled, this value will be ignored.
+existingSecret:
+  name: "mongo-credentials"
+  key: "CONNECTION_URI"
+# port: "9216"
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  additionalLabels:
+    release:
+      prometheus #since i installed prometheus and grafana using the kube-prometheus-stack
+      #and my prometheus instance is configured to only discovered service monitors using the label "release: prometheus"
